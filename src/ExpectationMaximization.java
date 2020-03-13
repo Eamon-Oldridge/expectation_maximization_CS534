@@ -34,7 +34,7 @@ public class ExpectationMaximization {
         System.out.println("Cluster centers:");
         for (int i = 0; i < gaussians.size(); i++) {
             ArrayList<Double> mean = gaussians.get(i).getMean();
-            System.out.println("Cluster " + i + 1 + ":");
+            System.out.println("Cluster " + (i + 1) + ":");
             for (int j = 0; j < gaussians.get(0).getMean().size(); j++) {
                 System.out.print(mean.get(j) + " ");
             }
