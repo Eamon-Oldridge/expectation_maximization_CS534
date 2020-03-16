@@ -25,8 +25,14 @@ public class ExpectationMaximization {
         double[][] probabilities = new double[values.size()][values.get(0).size()];
         long startTime = System.currentTimeMillis();
         //run while fewer than 10 seconds have elapsed
+        double logLikelihood = 0;
         while (System.currentTimeMillis() - startTime < 10000) {
             probabilities = expectation(gaussians);
+            //calculate log likelihood given these probabilities
+            logLikelihood = logLikelihood(probabilities);
+            //System.out.println(logLikelihood);
+            //normalize probabilities and pass to maximization function
+            probabilities = normalize(probabilities);
             gaussians = maximization(probabilities, gaussians.size());
         }
         //print out the cluster centers when done
@@ -34,12 +40,13 @@ public class ExpectationMaximization {
         System.out.println("Cluster centers:");
         for (int i = 0; i < gaussians.size(); i++) {
             ArrayList<Double> mean = gaussians.get(i).getMean();
-            System.out.println("Cluster " + (i + 1) + ":");
+            System.out.println("Cluster " + (i + 1)  + ":");
             for (int j = 0; j < gaussians.get(0).getMean().size(); j++) {
                 System.out.print(mean.get(j) + " ");
             }
             System.out.println();
         }
+        System.out.println("Log likelihood: " + logLikelihood);
     }
 
     /**
@@ -60,8 +67,7 @@ public class ExpectationMaximization {
                     //the 'rth' row of values is the cluster center for this gaussian
                     ArrayList<Double> mean = new ArrayList<Double>(values.get(r));
 
-                    //FOR NOW SETTING ALL DIMENSIONS OF THE VARIANCE TO 5
-                    //NEED TO FIGURE OUT A BETTER METHOD
+                    //set variance to a generic number
                     int size = mean.size();
                     ArrayList<Double> variance = new ArrayList<Double>();
                     for (int j = 0; j < size; j++) {
@@ -78,6 +84,23 @@ public class ExpectationMaximization {
     }
 
     /**
+     * given the probabilities of each point belonging to each cluster (not normalized),
+     * calculate the log likelihood of the data
+     */
+    private double logLikelihood(double[][] probabilities) {
+        double logLikelihood = 0;
+        for (int i = 0; i < probabilities.length; i++) {
+            double sum = 0;
+            for (int j = 0; j < probabilities[0].length; j++) {
+                sum += probabilities[i][j];
+            }
+            sum = Math.log(sum);
+            logLikelihood += sum;
+        }
+        return logLikelihood;
+    }
+
+    /**
      * runs the expectation step of the algorithm
      * given the cluster means and variances,
      * calculate the probability of each point belonging to each cluster
@@ -91,7 +114,6 @@ public class ExpectationMaximization {
                 Gaussian gaussian = gaussians.get(j);
                 double probability = 1;
                 //need to multiply by value for each dimension of the point
-                //refer to slide 26 from: http://u.cs.biu.ac.il/~jkeshet/teaching/spr2017/spr2017_lecture4.pdf
                 for (int k = 0; k < point.size(); k++) {
                     double value = point.get(k);
                     double mean = gaussian.getMean().get(k);
@@ -100,24 +122,25 @@ public class ExpectationMaximization {
                 }
                 probabilities[i][j] = probability;
             }
-            //normalize the probabilities
-            double sum = 0;
-            for (int j = 0; j < gaussians.size(); j++) {
-                sum+= probabilities[i][j];
-            }
-            for (int j = 0; j < gaussians.size(); j++) {
-                probabilities[i][j] /= sum;
-            }
         }
-
         return probabilities;
     }
 
-    /**
-     * implements function from slide 26 from: http://u.cs.biu.ac.il/~jkeshet/teaching/spr2017/spr2017_lecture4.pdf
-     */
+    private double[][] normalize(double[][] probabilities) {
+        for (int i = 0; i < probabilities.length; i++) {
+            double sum = 0;
+            for (int j = 0; j < probabilities[0].length; j++) {
+                sum += probabilities[i][j];
+            }
+            for (int j = 0; j < probabilities[0].length; j++) {
+                probabilities[i][j] /= sum;
+            }
+        }
+        return probabilities;
+    }
+
     private double expectationFunction(double value, double mean, double variance) {
-        double n1 = 1/(Math.sqrt(2 * Math.PI) * variance);
+        double n1 = 1/(Math.sqrt(2 * Math.PI * variance));
         double n2 = -(Math.pow((value-mean), 2))/(2*variance);
         double n3 = n1*Math.pow(Math.E, n2);
         return n3;
