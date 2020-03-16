@@ -33,10 +33,9 @@ public class ExpectationMaximization {
             //System.out.println(logLikelihood);
             //normalize probabilities and pass to maximization function
             probabilities = normalize(probabilities);
-            gaussians = maximization(probabilities, gaussians.size());
+            gaussians = maximization(probabilities);
         }
-        //print out the cluster centers when done
-        //TO DO: this method should return a list of clusters to be written to a file
+        //print out the cluster centers and log likelihood when done
         System.out.println("Cluster centers:");
         for (int i = 0; i < gaussians.size(); i++) {
             ArrayList<Double> mean = gaussians.get(i).getMean();
@@ -151,10 +150,10 @@ public class ExpectationMaximization {
      * given the probabilities of each point belonging to each cluster,
      * recalculate the cluster means and variances
      */
-    private ArrayList<Gaussian> maximization(double[][] probabilities, int n) {
+    private ArrayList<Gaussian> maximization(double[][] probabilities) {
         ArrayList<Gaussian> gaussians = new ArrayList<Gaussian>();
 
-        for (int i = 0; i < n; i++) { //do for each gaussian
+        for (int i = 0; i < probabilities[0].length; i++) { //do for each gaussian
             ArrayList<Double> means = new ArrayList<Double>();
             ArrayList<Double> variances = new ArrayList<Double>();
             for (int j = 0; j < values.get(0).size(); j++) { //for each dimension of the point
