@@ -16,9 +16,11 @@ public class ExpectationMaximization {
      * @param n the number of clusters to generate
      */
     public void run(int n) {
-        //TO DO: if given number of clusters is zero, need to determine optimal number of clusters
-        //use BIC mentioned in assignment description
+        //TO DO: implement BIC if n = 0
         ArrayList<Gaussian> gaussians = getInitialGaussians(n);
+        //store the best results
+        ArrayList<Gaussian> bestGaussian = gaussians;
+        double bestLogLikelihood = -1000000;
         //stores the probabilities that each point belongs to each gaussian, where
         //each row represents a point
         //each column represents one of the gaussians/clusters
@@ -26,26 +28,34 @@ public class ExpectationMaximization {
         long startTime = System.currentTimeMillis();
         //run while fewer than 10 seconds have elapsed
         double logLikelihood = 0;
+        double prevLogLikelihood = -1000000;
         while (System.currentTimeMillis() - startTime < 10000) {
             probabilities = expectation(gaussians);
             //calculate log likelihood given these probabilities
+            prevLogLikelihood = logLikelihood;
             logLikelihood = logLikelihood(probabilities);
             //System.out.println(logLikelihood);
             //normalize probabilities and pass to maximization function
             probabilities = normalize(probabilities);
             gaussians = maximization(probabilities);
+            if (logLikelihood > bestLogLikelihood) {
+                bestGaussian = gaussians;
+                bestLogLikelihood = logLikelihood;
+            }
+            if (logLikelihood - prevLogLikelihood < 0.1) gaussians = getInitialGaussians(n);
+            System.out.println(logLikelihood);
         }
         //print out the cluster centers and log likelihood when done
         System.out.println("Cluster centers:");
-        for (int i = 0; i < gaussians.size(); i++) {
-            ArrayList<Double> mean = gaussians.get(i).getMean();
+        for (int i = 0; i < bestGaussian.size(); i++) {
+            ArrayList<Double> mean = bestGaussian.get(i).getMean();
             System.out.println("Cluster " + (i + 1)  + ":");
-            for (int j = 0; j < gaussians.get(0).getMean().size(); j++) {
+            for (int j = 0; j < bestGaussian.get(0).getMean().size(); j++) {
                 System.out.print(mean.get(j) + " ");
             }
             System.out.println();
         }
-        System.out.println("Log likelihood: " + logLikelihood);
+        System.out.println("Log likelihood: " + bestLogLikelihood);
     }
 
     /**

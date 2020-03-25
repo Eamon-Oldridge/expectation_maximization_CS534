@@ -5,11 +5,11 @@ import java.util.ArrayList;
 
 public class Main {
 
-    public static void main(String[] args) {
+      public static void main(String[] args) {
 
         //eventually have these values input in command line
         String filename = "sampledata.csv";
-        int numClusters = 2;
+        int numClusters = 3;
 
         ArrayList<ArrayList<Double>> values = parseFile(filename);
         ExpectationMaximization EM = new ExpectationMaximization(values);
