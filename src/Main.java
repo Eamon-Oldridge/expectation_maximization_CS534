@@ -13,7 +13,7 @@ public class Main {
 
         ArrayList<ArrayList<Double>> values = parseFile(filename);
         ExpectationMaximization EM = new ExpectationMaximization(values);
-        EM.run(numClusters);
+        EM.start(numClusters);
 
     }
 

@@ -3,6 +3,7 @@ import java.util.ArrayList;
 public class ExpectationMaximization {
 
     private ArrayList<ArrayList<Double>> values;
+    private static final double LIMIT = 0.1; //used to determine when to restart
 
     /**
      * constructor
@@ -12,50 +13,63 @@ public class ExpectationMaximization {
     }
 
     /**
-     * run the expectation maximization algorithm
+     * starts the expectation maximization algorithm
+     * does BIC first if n = 0
      * @param n the number of clusters to generate
      */
-    public void run(int n) {
-        //TO DO: implement BIC if n = 0
+    public void start(int n) {
+        long startTime = System.currentTimeMillis();
+        if (n == 0) n = getBIC();
+        long timeElapsed = System.currentTimeMillis() - startTime;
+        Result result = runEM(10000 - timeElapsed, n);
+        System.out.println("done");
+    }
+
+    /**
+     * runs the expectation maximization algorithm
+     * @param time how long to run the algorithm for (in ms)
+     * @param n number of clusters
+     */
+    private Result runEM(long time, int n) {
+        //randomly initialize gaussians
         ArrayList<Gaussian> gaussians = getInitialGaussians(n);
         //store the best results
-        ArrayList<Gaussian> bestGaussian = gaussians;
-        double bestLogLikelihood = -1000000;
+        ArrayList<Gaussian> bestGaussians = gaussians;
+        double bestLL = -1000000;
         //stores the probabilities that each point belongs to each gaussian, where
         //each row represents a point
         //each column represents one of the gaussians/clusters
         double[][] probabilities = new double[values.size()][values.get(0).size()];
         long startTime = System.currentTimeMillis();
-        //run while fewer than 10 seconds have elapsed
-        double logLikelihood = 0;
-        double prevLogLikelihood = -1000000;
-        while (System.currentTimeMillis() - startTime < 10000) {
-            probabilities = expectation(gaussians);
+        //run while fewer than input ms have elapsed
+        double LL = 0;
+        double previousLL = -1000000;
+        while (System.currentTimeMillis() - startTime < time) {
+            probabilities = expectation(gaussians); //EXPECTATION!
             //calculate log likelihood given these probabilities
-            prevLogLikelihood = logLikelihood;
-            logLikelihood = logLikelihood(probabilities);
-            //System.out.println(logLikelihood);
+            previousLL = LL;
+            LL = getLogLikelihood(probabilities);
             //normalize probabilities and pass to maximization function
             probabilities = normalize(probabilities);
-            gaussians = maximization(probabilities);
-            if (logLikelihood > bestLogLikelihood) {
-                bestGaussian = gaussians;
-                bestLogLikelihood = logLikelihood;
+            gaussians = maximization(probabilities); //MAXIMIZATION!
+            //if new LL is better than current best one, store it
+            if (LL > bestLL) {
+                bestGaussians = gaussians;
+                bestLL = LL;
             }
-            if (logLikelihood - prevLogLikelihood < 0.1) gaussians = getInitialGaussians(n);
-            System.out.println(logLikelihood);
+            if (LL - previousLL < 0.1) gaussians = getInitialGaussians(n);
         }
-        //print out the cluster centers and log likelihood when done
-        System.out.println("Cluster centers:");
-        for (int i = 0; i < bestGaussian.size(); i++) {
-            ArrayList<Double> mean = bestGaussian.get(i).getMean();
-            System.out.println("Cluster " + (i + 1)  + ":");
-            for (int j = 0; j < bestGaussian.get(0).getMean().size(); j++) {
-                System.out.print(mean.get(j) + " ");
-            }
-            System.out.println();
-        }
-        System.out.println("Log likelihood: " + bestLogLikelihood);
+        //return a Result object that stores gaussians and LL
+        return new Result(bestGaussians, bestLL);
+    }
+
+    /**
+     * runs bayesian information criterion (BIC)
+     * to determine optimal number of clusters
+     */
+    private int getBIC() {
+        //TO DO
+        return 3;
     }
 
     /**
@@ -65,7 +79,6 @@ public class ExpectationMaximization {
     private ArrayList<Gaussian> getInitialGaussians(int n) {
         ArrayList<Gaussian> gaussians = new ArrayList<Gaussian>();
         ArrayList<Integer> random = new ArrayList<Integer>();
-
         for (int i = 0; i < n; i++) { //generate n unique random numbers
             boolean valid = false;
             while (!valid) { //do this until we find a valid random number
@@ -73,10 +86,11 @@ public class ExpectationMaximization {
                 if (!random.contains(r)) { //this random number is valid if we have not already used it
                     random.add(r);
                     valid = true;
-                    //the 'rth' row of values is the cluster center for this gaussian
+                    //the value at position r is a cluster center
                     ArrayList<Double> mean = new ArrayList<Double>(values.get(r));
 
                     //set variance to a generic number
+                    //TO DO: Change to variance of entire data set? Starting variance shouldn't matter too much.
                     int size = mean.size();
                     ArrayList<Double> variance = new ArrayList<Double>();
                     for (int j = 0; j < size; j++) {
@@ -88,7 +102,6 @@ public class ExpectationMaximization {
                 }
             }
         }
-
         return gaussians;
     }
 
@@ -96,7 +109,7 @@ public class ExpectationMaximization {
      * given the probabilities of each point belonging to each cluster (not normalized),
      * calculate the log likelihood of the data
      */
-    private double logLikelihood(double[][] probabilities) {
+    private double getLogLikelihood(double[][] probabilities) {
         double logLikelihood = 0;
         for (int i = 0; i < probabilities.length; i++) {
             double sum = 0;
@@ -135,6 +148,19 @@ public class ExpectationMaximization {
         return probabilities;
     }
 
+    /**
+     * calculate the probability that a value belongs to a gaussian with given mean and variance
+     */
+    private double expectationFunction(double value, double mean, double variance) {
+        double n1 = 1/(Math.sqrt(2 * Math.PI * variance));
+        double n2 = -(Math.pow((value-mean), 2))/(2*variance);
+        double n3 = n1*Math.pow(Math.E, n2);
+        return n3;
+    }
+
+    /**
+     * given a list of groups of probabilities, normalize each row
+     */
     private double[][] normalize(double[][] probabilities) {
         for (int i = 0; i < probabilities.length; i++) {
             double sum = 0;
@@ -146,13 +172,6 @@ public class ExpectationMaximization {
             }
         }
         return probabilities;
-    }
-
-    private double expectationFunction(double value, double mean, double variance) {
-        double n1 = 1/(Math.sqrt(2 * Math.PI * variance));
-        double n2 = -(Math.pow((value-mean), 2))/(2*variance);
-        double n3 = n1*Math.pow(Math.E, n2);
-        return n3;
     }
 
     /**
@@ -169,7 +188,7 @@ public class ExpectationMaximization {
             for (int j = 0; j < values.get(0).size(); j++) { //for each dimension of the point
                 double numerator1 = 0;
                 double denominator = 0;
-                //calculating new MEAN
+                //CALCULATING NEW MEAN
                 for (int k = 0; k < probabilities.length; k++) { //for each point
                     ArrayList<Double> point = values.get(k);
                     numerator1 += probabilities[k][i]*point.get(j);
@@ -178,7 +197,7 @@ public class ExpectationMaximization {
                 double mean = numerator1/denominator;
                 means.add(mean);
                 double numerator2 = 0;
-                //calculating new VARIANCE
+                //CALCULATING NEW VARIANCE
                 for (int k = 0; k < probabilities.length; k++) { //for each point
                     ArrayList<Double> point = values.get(k);
                     numerator2 += probabilities[k][i]*Math.pow(point.get(j)-mean,2);
