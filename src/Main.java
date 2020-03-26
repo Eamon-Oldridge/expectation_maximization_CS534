@@ -9,7 +9,7 @@ public class Main {
 
         //eventually have these values input in command line
         String filename = "sampledata.csv";
-        int numClusters = 3;
+        int numClusters = 0;
 
         ArrayList<ArrayList<Double>> values = parseFile(filename);
         ExpectationMaximization EM = new ExpectationMaximization(values);

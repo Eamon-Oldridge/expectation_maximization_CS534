@@ -68,8 +68,34 @@ public class ExpectationMaximization {
      * to determine optimal number of clusters
      */
     private int getBIC() {
-        //TO DO
-        return 3;
+        ArrayList<Double> BICS = new ArrayList<Double>();
+        for (int i = 1; i <= 20; i++) {
+            Result result = runEM(250, i);
+            System.out.println(result.getLL());
+            double k = result.getGaussians().size() * (2 * values.get(0).size() + 1); //number of parameters
+            double n = values.size(); //sample size
+            double BIC = k * Math.log(n) - 2 * result.getLL();
+            BICS.add(BIC);
+        }
+        for (int i = 0; i < 20; i++) {
+            System.out.println(BICS.get(i));
+        }
+        return 3; //TO DO: return the optimal value
+    }
+
+    /**
+     * finds the angle made by the segments p1p2 and p2p3
+     */
+    private double getAngle(double p1, double p2, double p3) {
+        double p1p2 = Math.sqrt(1 + Math.pow(p2 - p1, 2));
+        double p2p3 = Math.sqrt(1 + Math.pow(p3 - p2, 2));
+        double p1p3 = Math.sqrt(4 + Math.pow(p3 - p1, 2));
+
+        double cosa = (Math.pow(p1p3, 2) - Math.pow(p1p2, 2) - Math.pow(p2p3, 2))/(-2*p1p2*p2p3);
+        double a = Math.acos(cosa);
+        System.out.println(Math.toDegrees(a));
+
+        return 0;
     }
 
     /**
