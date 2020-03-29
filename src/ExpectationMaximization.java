@@ -3,7 +3,6 @@ import java.util.ArrayList;
 public class ExpectationMaximization {
 
     private ArrayList<ArrayList<Double>> values;
-    private static final double LIMIT = 0.1; //used to determine when to restart
 
     /**
      * constructor
@@ -17,12 +16,32 @@ public class ExpectationMaximization {
      * does BIC first if n = 0
      * @param n the number of clusters to generate
      */
-    public void start(int n) {
+    public void start(int n, boolean printLL, boolean printProb) {
+        System.out.println("Running expectation maximization...\n");
         long startTime = System.currentTimeMillis();
-        if (n == 0) n = getBIC();
+        if (n == 0) n = getBIC(); //run BIC and keep track of time if n == 0
         long timeElapsed = System.currentTimeMillis() - startTime;
-        Result result = runEM(10000 - timeElapsed, n);
-        System.out.println("done");
+        Result result = runEM(10000 - timeElapsed, n, printLL, printProb);
+
+        //print results
+        ArrayList<Gaussian> gaussians = result.getGaussians();
+        for (int i  = 0; i < gaussians.size(); i++) {
+            System.out.println("Cluster " + (i + 1) + ":");
+            Gaussian gaussian = gaussians.get(i);
+            ArrayList<Double> mean = gaussian.getMean();
+            ArrayList<Double> variance = gaussian.getVariance();
+            for (int j = 0; j < mean.size(); j++) {
+                System.out.print("Dimension " + (j + 1) + ": ");
+                System.out.print("Mean " + mean.get(j) + ", ");
+                System.out.println("Variance " + variance.get(j));
+            }
+            System.out.println();
+        }
+        System.out.println("Log likelihood: " + result.getLL());
+        double k = result.getGaussians().size() * (2 * values.get(0).size() + 1); //number of parameters
+        double num = values.size(); //sample size
+        double BIC = k * Math.log(num) - 2 * result.getLL();
+        System.out.println("BIC: " + BIC);
     }
 
     /**
@@ -30,34 +49,65 @@ public class ExpectationMaximization {
      * @param time how long to run the algorithm for (in ms)
      * @param n number of clusters
      */
-    private Result runEM(long time, int n) {
+    private final double RESTART = 0.01;
+    private final int MAXRESTART = 20;
+    private Result runEM(long time, int n, boolean printLL, boolean printProb) {
         //randomly initialize gaussians
         ArrayList<Gaussian> gaussians = getInitialGaussians(n);
+        ArrayList<Gaussian> initial = new ArrayList<Gaussian>(gaussians);
+
         //store the best results
         ArrayList<Gaussian> bestGaussians = gaussians;
         double bestLL = -1000000;
+        ArrayList<Gaussian> bestInitial = new ArrayList<Gaussian>(initial);
+
         //stores the probabilities that each point belongs to each gaussian, where
         //each row represents a point
         //each column represents one of the gaussians/clusters
         double[][] probabilities = new double[values.size()][values.get(0).size()];
-        long startTime = System.currentTimeMillis();
+
         //run while fewer than input ms have elapsed
+        long startTime = System.currentTimeMillis();
         double LL = 0;
         double previousLL = -1000000;
+        int restarts = -1; //first restart doesn't count becuase of intial previousLL value
         while (System.currentTimeMillis() - startTime < time) {
             probabilities = expectation(gaussians); //EXPECTATION!
-            //calculate log likelihood given these probabilities
             previousLL = LL;
             LL = getLogLikelihood(probabilities);
-            //normalize probabilities and pass to maximization function
+            if (printLL) System.out.println(LL);
             probabilities = normalize(probabilities);
             gaussians = maximization(probabilities); //MAXIMIZATION!
+
             //if new LL is better than current best one, store it
             if (LL > bestLL) {
                 bestGaussians = gaussians;
                 bestLL = LL;
+                //store the initial cluster centers that produces this result
+                bestInitial = new ArrayList<Gaussian>(initial);
             }
-            if (LL - previousLL < 0.1) gaussians = getInitialGaussians(n);
+
+            //handle restarting
+            if (LL - previousLL < RESTART && restarts < MAXRESTART) {
+                gaussians = getInitialGaussians(n);
+                initial = new ArrayList<Gaussian>(gaussians);
+                restarts++;
+            }
+
+            //once we have used up maximum restarts
+            //run with the initial cluster centers that produced best results for reainder of time
+            if (restarts == MAXRESTART) {
+                gaussians = getInitialGaussians(n);
+                restarts++;
+            }
+        }
+        if(printProb) {
+            for (int i = 0; i < values.size(); i++) {
+                for (int j = 0; j < n; j++) {
+                    System.out.print(probabilities[i][j] + " ");
+                }
+                System.out.println();
+            }
         }
         //return a Result object that stores gaussians and LL
         return new Result(bestGaussians, bestLL);
@@ -70,35 +120,26 @@ public class ExpectationMaximization {
     private int getBIC() {
         ArrayList<Double> BICS = new ArrayList<Double>();
         for (int i = 1; i <= 20; i++) {
-            Result result = runEM(250, i);
-            System.out.println(result.getLL());
+            Result result = runEM(250, i, false, false);
             double k = result.getGaussians().size() * (2 * values.get(0).size() + 1); //number of parameters
             double n = values.size(); //sample size
             double BIC = k * Math.log(n) - 2 * result.getLL();
             BICS.add(BIC);
         }
+        //take the minimum value
+        int min = 0;
+        double minValue = BICS.get(0);
         for (int i = 0; i < 20; i++) {
-            System.out.println(BICS.get(i));
+            if (BICS.get(i) < minValue) {
+                min = i;
+                minValue = BICS.get(i);
+            }
         }
-        return 3; //TO DO: return the optimal value
+        min++; //plus one because of zero-indexing
+        return min;
     }
 
-    /**
-     * finds the angle made by the segments p1p2 and p2p3
-     */
-    private double getAngle(double p1, double p2, double p3) {
-        double p1p2 = Math.sqrt(1 + Math.pow(p2 - p1, 2));
-        double p2p3 = Math.sqrt(1 + Math.pow(p3 - p2, 2));
-        double p1p3 = Math.sqrt(4 + Math.pow(p3 - p1, 2));
-
-        double cosa = (Math.pow(p1p3, 2) - Math.pow(p1p2, 2) - Math.pow(p2p3, 2))/(-2*p1p2*p2p3);
-        double a = Math.acos(cosa);
-        System.out.println(Math.toDegrees(a));
-
-        return 0;
-    }
-
-    /**
+     /**
      * generates n random gaussians
      * @param n number of gaussians to generate
      */
@@ -115,12 +156,17 @@ public class ExpectationMaximization {
                     //the value at position r is a cluster center
                     ArrayList<Double> mean = new ArrayList<Double>(values.get(r));
 
-                    //set variance to a generic number
-                    //TO DO: Change to variance of entire data set? Starting variance shouldn't matter too much.
+                    //calculate variance for each cluster using entire data set
                     int size = mean.size();
                     ArrayList<Double> variance = new ArrayList<Double>();
                     for (int j = 0; j < size; j++) {
-                        variance.add(5.0);
+                        double sum = 0;
+                        for (int k = 0; k < values.size(); k++) {
+                            double value = values.get(k).get(j);
+                            sum += Math.pow(mean.get(j) - value, 2);
+                        }
+                        sum /= values.size();
+                        variance.add(sum);
                     }
 
                     Gaussian g = new Gaussian(mean, variance);
