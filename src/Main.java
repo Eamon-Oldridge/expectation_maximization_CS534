@@ -7,9 +7,15 @@ public class Main {
 
       public static void main(String[] args) {
 
-        //eventually have these values input in command line
-        String filename = "sampledata.csv";
-        int numClusters = 3;
+          //handle command line arguments
+
+          if (args.length == 0 || args.length == 1) {
+              System.out.println("Insufficient command line arguments.");
+              return;
+          }
+
+          String filename = args[0];
+          int numClusters = Integer.parseInt(args[1]);
 
         ArrayList<ArrayList<Double>> values = parseFile(filename);
         ExpectationMaximization EM = new ExpectationMaximization(values);
